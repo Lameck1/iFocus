@@ -10,8 +10,8 @@ Use this checklist before publishing a build.
 
 ## Version control bootstrap
 
-- [ ] Initialize git repository (if not already initialized).
-- [ ] Commit current release-ready baseline.
+- [x] Initialize git repository (if not already initialized).
+- [x] Commit current release-ready baseline.
 - [ ] Add remote origin and push default branch.
 - [ ] Enable branch protection and required status checks for CI.
 
