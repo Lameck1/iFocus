@@ -29,6 +29,14 @@ Date: 2026-03-18
 - `versionCode = 2`
 - `versionName = "1.1.0"`
 
+## Version control state
+
+- Local repository initialized (`.git` present).
+- Current branch: `main`.
+- Latest commits:
+  - `abb6a90` - docs: update release checklist status
+  - `773df5b` - chore: release readiness baseline v1.1.0
+
 ## Migration coverage
 
 - Added migration chain test `migrate1To5_runsFullChain_andBackfillsTaskMetadata` in `app/src/androidTest/java/com/lameck/ifocus/data/FocusDatabaseMigrationTest.kt`.
@@ -41,4 +49,5 @@ Date: 2026-03-18
 - Push to remote and verify `.github/workflows/android-ci.yml` green on release commit.
 - Verify repository secrets for signing and Play internal deploy.
 - Tag release commit (`v1.1.0`) and run `.github/workflows/android-release.yml` / `.github/workflows/android-deploy-internal.yml`.
+
 
