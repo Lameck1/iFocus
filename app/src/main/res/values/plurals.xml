@@ -1,0 +1,17 @@
+<resources>
+    <plurals name="focused_minutes_value">
+        <item quantity="one">Focused minute: %d</item>
+        <item quantity="other">Focused minutes: %d</item>
+    </plurals>
+
+    <plurals name="interruptions_value">
+        <item quantity="one">Interruption logged: %d</item>
+        <item quantity="other">Interruptions logged: %d</item>
+    </plurals>
+
+    <plurals name="session_outcome_prompt">
+        <item quantity="one">How did "%1$s" go after %2$d minute?</item>
+        <item quantity="other">How did "%1$s" go after %2$d minutes?</item>
+    </plurals>
+</resources>
+

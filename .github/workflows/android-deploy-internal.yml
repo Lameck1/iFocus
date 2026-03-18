@@ -1,0 +1,82 @@
+name: Android Deploy Internal
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: "Release label for this internal upload"
+        required: true
+        default: "manual-internal"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-internal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode release keystore
+        env:
+          IFOCUS_RELEASE_STORE_FILE_BASE64: ${{ secrets.IFOCUS_RELEASE_STORE_FILE_BASE64 }}
+          IFOCUS_RELEASE_STORE_PASSWORD: ${{ secrets.IFOCUS_RELEASE_STORE_PASSWORD }}
+          IFOCUS_RELEASE_KEY_ALIAS: ${{ secrets.IFOCUS_RELEASE_KEY_ALIAS }}
+          IFOCUS_RELEASE_KEY_PASSWORD: ${{ secrets.IFOCUS_RELEASE_KEY_PASSWORD }}
+        run: |
+          for secret_name in \
+            IFOCUS_RELEASE_STORE_FILE_BASE64 \
+            IFOCUS_RELEASE_STORE_PASSWORD \
+            IFOCUS_RELEASE_KEY_ALIAS \
+            IFOCUS_RELEASE_KEY_PASSWORD
+          do
+            if [ -z "${!secret_name}" ]; then
+              echo "Missing required secret: $secret_name"
+              exit 1
+            fi
+          done
+          echo "$IFOCUS_RELEASE_STORE_FILE_BASE64" | base64 --decode > "$RUNNER_TEMP/ifocus-release.jks"
+
+      - name: Build signed release bundle
+        env:
+          IFOCUS_RELEASE_STORE_FILE: ${{ runner.temp }}/ifocus-release.jks
+          IFOCUS_RELEASE_STORE_PASSWORD: ${{ secrets.IFOCUS_RELEASE_STORE_PASSWORD }}
+          IFOCUS_RELEASE_KEY_ALIAS: ${{ secrets.IFOCUS_RELEASE_KEY_ALIAS }}
+          IFOCUS_RELEASE_KEY_PASSWORD: ${{ secrets.IFOCUS_RELEASE_KEY_PASSWORD }}
+        run: ./gradlew :app:bundleRelease --console=plain
+
+      - name: Upload to Play Internal Track
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.lameck.ifocus
+          releaseFiles: app/build/outputs/bundle/release/*.aab
+          track: internal
+          status: completed
+          releaseName: ${{ github.event.inputs.release_name }}
+
+      - name: Upload deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-internal-deploy-artifacts
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/reports/lint-results-release.xml
+

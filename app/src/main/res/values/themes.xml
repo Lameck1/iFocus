@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.IFocus" parent="Theme.MaterialComponents.Light" />
+</resources>
