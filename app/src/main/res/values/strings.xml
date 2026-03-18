@@ -22,7 +22,6 @@
     <string name="history_title">Session History</string>
     <string name="history_empty">No sessions yet.</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_placeholder">Settings page is in progress. Presets, sounds, auto-start, and privacy controls will live here.</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>

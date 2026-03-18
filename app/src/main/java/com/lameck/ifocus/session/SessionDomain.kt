@@ -9,13 +9,10 @@ enum class SessionType {
 }
 
 enum class SessionStatus {
-    IDLE,
     RUNNING_FOCUS,
     PAUSED_FOCUS,
     RUNNING_BREAK,
-    PAUSED_BREAK,
-    COMPLETED,
-    CANCELLED
+    PAUSED_BREAK
 }
 
 fun TimerMode.toSessionType(): SessionType = when (this) {
