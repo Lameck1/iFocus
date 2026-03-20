@@ -11,7 +11,7 @@ class SessionCsvFormatterTest {
     fun `format returns header when no records`() {
         val csv = SessionCsvFormatter.format(emptyList())
 
-        assertEquals("id,taskId,taskTitle,focusedMinutes,outcome,createdAtEpochMs", csv)
+        assertEquals("id,taskId,taskTitle,projectName,focusedMinutes,outcome,createdAtEpochMs", csv)
     }
 
     @Test
@@ -22,6 +22,7 @@ class SessionCsvFormatterTest {
                     id = "1",
                     taskId = "task-1",
                     taskTitle = "Client \"A\" proposal",
+                    projectName = "Client A",
                     focusedMinutes = 25,
                     outcome = SessionOutcome.DONE,
                     createdAtEpochMs = 1234L
@@ -30,7 +31,7 @@ class SessionCsvFormatterTest {
         )
 
         assertEquals(
-            "id,taskId,taskTitle,focusedMinutes,outcome,createdAtEpochMs\n\"1\",\"task-1\",\"Client \"\"A\"\" proposal\",25,DONE,1234",
+            "id,taskId,taskTitle,projectName,focusedMinutes,outcome,createdAtEpochMs\n\"1\",\"task-1\",\"Client \"\"A\"\" proposal\",\"Client A\",25,DONE,1234",
             csv
         )
     }

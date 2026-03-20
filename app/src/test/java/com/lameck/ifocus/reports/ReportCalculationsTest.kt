@@ -20,6 +20,7 @@ class ReportCalculationsTest {
         assertEquals(40, summary.totalMinutes)
         assertEquals(1, summary.completedSessions)
         assertEquals(1, summary.interruptedSessions)
+        assertEquals(25, summary.averageUninterruptedFocusMinutes)
     }
 
     @Test
@@ -61,16 +62,47 @@ class ReportCalculationsTest {
         assertTrue(breakdown[0].second >= breakdown[1].second)
     }
 
+    @Test
+    fun `breakdownByProject aggregates project totals`() {
+        val breakdown = breakdownByProject(
+            listOf(
+                record("1", "Task A", 20, SessionOutcome.DONE, 1_000L, projectName = "Client A"),
+                record("2", "Task B", 15, SessionOutcome.DONE, 1_100L, projectName = "Client A"),
+                record("3", "Task C", 25, SessionOutcome.DONE, 1_200L, projectName = "Internal")
+            )
+        )
+
+        assertEquals("Client A", breakdown.first().first)
+        assertEquals(35, breakdown.first().second)
+    }
+
+    @Test
+    fun `streak calculations respect daily goal`() {
+        val day = 24L * 60L * 60L * 1000L
+        val now = 10 * day
+        val records = listOf(
+            record("1", "Task", 60, SessionOutcome.DONE, now - 2 * day),
+            record("2", "Task", 65, SessionOutcome.DONE, now - day),
+            record("3", "Task", 70, SessionOutcome.DONE, now),
+            record("4", "Task", 20, SessionOutcome.PARTIAL, now)
+        )
+
+        assertEquals(3, currentStreakDays(records, dailyGoalMinutes = 50, nowEpochMs = now))
+        assertEquals(3, bestStreakDays(records, dailyGoalMinutes = 50))
+    }
+
     private fun record(
         id: String,
         title: String,
         minutes: Int,
         outcome: SessionOutcome,
-        now: Long
+        now: Long,
+        projectName: String? = null
     ): SessionRecord {
         return SessionRecord(
             id = id,
             taskTitle = title,
+            projectName = projectName,
             focusedMinutes = minutes,
             outcome = outcome,
             createdAtEpochMs = now

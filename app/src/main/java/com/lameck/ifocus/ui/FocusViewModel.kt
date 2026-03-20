@@ -83,11 +83,19 @@ enum class InterruptionReason {
 data class FocusTask(
     val id: String,
     val title: String,
+    val projectName: String = "",
     val estimateMinutes: Int,
     val priority: TaskPriority,
     val status: TaskStatus = TaskStatus.PLANNED,
     val todayMinutesFocused: Int = 0,
     val notes: String = "",
+    val isArchived: Boolean = false,
+    val plannedDateEpochDay: Long? = null,
+    val updatedAtEpochMs: Long = System.currentTimeMillis()
+)
+
+data class FocusProject(
+    val name: String,
     val isArchived: Boolean = false,
     val updatedAtEpochMs: Long = System.currentTimeMillis()
 )
@@ -95,10 +103,11 @@ data class FocusTask(
 data class SessionRecord(
     val id: String,
     val taskTitle: String,
+    val taskId: String? = null,
+    val projectName: String? = null,
     val focusedMinutes: Int,
     val outcome: SessionOutcome,
-    val createdAtEpochMs: Long = System.currentTimeMillis(),
-    val taskId: String? = null
+    val createdAtEpochMs: Long = System.currentTimeMillis()
 )
 
 data class PendingSessionOutcome(
@@ -115,11 +124,15 @@ data class PendingInterruption(
 data class AppSettings(
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
     val autoStartBreak: Boolean = false,
-    val autoStartFocus: Boolean = false
+    val autoStartFocus: Boolean = false,
+    val dailyGoalMinutes: Int = 120,
+    val calendarSafePlanningEnabled: Boolean = true,
+    val hasCompletedOnboarding: Boolean = false
 )
 
 data class ProfessionalUiState(
     val tasks: List<FocusTask>,
+    val projects: List<FocusProject> = emptyList(),
     val selectedTaskId: String?,
     val activeSessionTaskId: String? = null,
     val pendingSessionOutcome: PendingSessionOutcome? = null,
@@ -334,8 +347,10 @@ class FocusViewModel(
 
     fun addTask(
         title: String,
+        projectName: String = "",
         estimateMinutes: Int = 50,
-        priority: TaskPriority = TaskPriority.P2
+        priority: TaskPriority = TaskPriority.P2,
+        plannedDateEpochDay: Long? = null
     ) {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isEmpty()) return
@@ -343,8 +358,10 @@ class FocusViewModel(
         val newTask = FocusTask(
             id = UUID.randomUUID().toString(),
             title = trimmedTitle,
+            projectName = projectName.trim(),
             estimateMinutes = estimateMinutes,
             priority = priority,
+            plannedDateEpochDay = plannedDateEpochDay,
             updatedAtEpochMs = System.currentTimeMillis()
         )
         _professionalState.update { state ->
@@ -355,14 +372,17 @@ class FocusViewModel(
             )
         }
         persistTasks()
+        ensureProjectExists(newTask.projectName)
     }
 
     fun updateTask(
         taskId: String,
         title: String,
+        projectName: String? = null,
         estimateMinutes: Int,
         priority: TaskPriority,
-        notes: String
+        notes: String,
+        plannedDateEpochDay: Long? = null
     ) {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isEmpty()) return
@@ -374,9 +394,11 @@ class FocusViewModel(
                     if (task.id == taskId) {
                         task.copy(
                             title = trimmedTitle,
+                            projectName = (projectName ?: task.projectName).trim(),
                             estimateMinutes = estimateMinutes.coerceIn(15, 180),
                             priority = priority,
                             notes = notes.trim(),
+                            plannedDateEpochDay = plannedDateEpochDay ?: task.plannedDateEpochDay,
                             updatedAtEpochMs = now
                         )
                     } else {
@@ -386,6 +408,8 @@ class FocusViewModel(
             )
         }
         persistTasks()
+        val updatedTask = _professionalState.value.tasks.firstOrNull { it.id == taskId }
+        ensureProjectExists(updatedTask?.projectName.orEmpty())
     }
 
     fun setTaskArchived(taskId: String, archived: Boolean) {
@@ -440,6 +464,7 @@ class FocusViewModel(
 
     fun completePendingSession(outcome: SessionOutcome) {
         val pendingOutcome = _professionalState.value.pendingSessionOutcome ?: return
+        val completedTask = _professionalState.value.tasks.firstOrNull { it.id == pendingOutcome.taskId }
 
         val updatedTasks = _professionalState.value.tasks.map { task ->
             if (task.id != pendingOutcome.taskId) {
@@ -459,10 +484,11 @@ class FocusViewModel(
         val newRecord = SessionRecord(
             id = UUID.randomUUID().toString(),
             taskTitle = pendingOutcome.taskTitle,
+            taskId = pendingOutcome.taskId,
+            projectName = completedTask?.projectName?.takeIf { it.isNotBlank() },
             focusedMinutes = pendingOutcome.focusedMinutes,
             outcome = outcome,
-            createdAtEpochMs = System.currentTimeMillis(),
-            taskId = pendingOutcome.taskId
+            createdAtEpochMs = System.currentTimeMillis()
         )
 
         _professionalState.update { state ->
@@ -501,6 +527,78 @@ class FocusViewModel(
             it.copy(settings = it.settings.copy(autoStartFocus = enabled))
         }
         persistSettings()
+    }
+
+    fun setDailyGoalMinutes(minutes: Int) {
+        _professionalState.update {
+            it.copy(settings = it.settings.copy(dailyGoalMinutes = minutes.coerceIn(25, 600)))
+        }
+        persistSettings()
+    }
+
+    fun setCalendarSafePlanningEnabled(enabled: Boolean) {
+        _professionalState.update {
+            it.copy(settings = it.settings.copy(calendarSafePlanningEnabled = enabled))
+        }
+        persistSettings()
+    }
+
+    fun completeOnboarding() {
+        _professionalState.update {
+            it.copy(settings = it.settings.copy(hasCompletedOnboarding = true))
+        }
+        persistSettings()
+    }
+
+    fun addProject(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        if (_professionalState.value.projects.any { it.name.equals(trimmed, ignoreCase = true) }) return
+        val project = FocusProject(name = trimmed, updatedAtEpochMs = System.currentTimeMillis())
+        _professionalState.update { it.copy(projects = (it.projects + project).sortedBy { p -> p.name.lowercase() }) }
+        viewModelScope.launch { repository.upsertProject(project) }
+    }
+
+    fun renameProject(oldName: String, newName: String) {
+        val source = oldName.trim()
+        val target = newName.trim()
+        if (source.isEmpty() || target.isEmpty() || source == target) return
+        val now = System.currentTimeMillis()
+        _professionalState.update { state ->
+            val updatedTasks = state.tasks.map { task ->
+                if (task.projectName == source) task.copy(projectName = target, updatedAtEpochMs = now) else task
+            }
+            val updatedProjects = state.projects
+                .filterNot { it.name == source }
+                .let { projects ->
+                    if (projects.any { it.name.equals(target, ignoreCase = true) }) projects
+                    else projects + FocusProject(name = target, updatedAtEpochMs = now)
+                }
+                .sortedBy { it.name.lowercase() }
+            state.copy(tasks = updatedTasks, projects = updatedProjects)
+        }
+        persistTasks()
+        viewModelScope.launch {
+            repository.deleteProject(source)
+            repository.upsertProject(FocusProject(name = target, updatedAtEpochMs = now))
+        }
+    }
+
+    fun deleteProject(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val now = System.currentTimeMillis()
+        _professionalState.update { state ->
+            val updatedTasks = state.tasks.map { task ->
+                if (task.projectName == trimmed) task.copy(projectName = "", updatedAtEpochMs = now) else task
+            }
+            state.copy(
+                tasks = updatedTasks,
+                projects = state.projects.filterNot { it.name == trimmed }
+            )
+        }
+        persistTasks()
+        viewModelScope.launch { repository.deleteProject(trimmed) }
     }
 
     fun buildSessionHistoryCsv(): String {
@@ -673,12 +771,34 @@ class FocusViewModel(
 
     private fun initialProfessionalState(): ProfessionalUiState {
         val initialTasks = listOf(
-            FocusTask(UUID.randomUUID().toString(), "Draft client proposal", 90, TaskPriority.P1),
-            FocusTask(UUID.randomUUID().toString(), "Review pull requests", 50, TaskPriority.P2),
-            FocusTask(UUID.randomUUID().toString(), "Plan sprint priorities", 30, TaskPriority.P1)
+            FocusTask(
+                id = UUID.randomUUID().toString(),
+                title = "Draft client proposal",
+                projectName = "Client Work",
+                estimateMinutes = 90,
+                priority = TaskPriority.P1
+            ),
+            FocusTask(
+                id = UUID.randomUUID().toString(),
+                title = "Review pull requests",
+                projectName = "Engineering",
+                estimateMinutes = 50,
+                priority = TaskPriority.P2
+            ),
+            FocusTask(
+                id = UUID.randomUUID().toString(),
+                title = "Plan sprint priorities",
+                projectName = "Planning",
+                estimateMinutes = 30,
+                priority = TaskPriority.P1
+            )
         )
+        val initialProjects = initialTasks.mapNotNull { task ->
+            task.projectName.takeIf { it.isNotBlank() }?.let { FocusProject(name = it) }
+        }.distinctBy { it.name }
         return ProfessionalUiState(
             tasks = initialTasks,
+            projects = initialProjects,
             selectedTaskId = initialTasks.firstOrNull()?.id
         )
     }
@@ -698,11 +818,13 @@ class FocusViewModel(
     private fun loadPersistedProfessionalState() {
         viewModelScope.launch {
             val persistedTasks = repository.loadTasks()
+            val persistedProjects = repository.loadProjects()
             val persistedSessions = repository.loadSessionHistory()
             val interruptionCounts = repository.loadInterruptionCounts()
             val persistedSettings = repository.loadAppSettings()
             if (persistedTasks.isEmpty()) {
                 persistTasks()
+                persistProjects()
                 _professionalState.update {
                     it.copy(
                         interruptionCounts = interruptionCounts,
@@ -716,6 +838,7 @@ class FocusViewModel(
             _professionalState.update { state ->
                 state.copy(
                     tasks = persistedTasks,
+                        projects = mergeProjects(persistedProjects, persistedTasks),
                     selectedTaskId = persistedTasks.firstOrNull { it.id == state.selectedTaskId }?.id
                         ?: persistedTasks.firstOrNull()?.id,
                     sessionHistory = persistedSessions,
@@ -726,11 +849,36 @@ class FocusViewModel(
         }
     }
 
+    private fun mergeProjects(projects: List<FocusProject>, tasks: List<FocusTask>): List<FocusProject> {
+        val taskProjects = tasks.mapNotNull { it.projectName.takeIf(String::isNotBlank) }
+            .distinct()
+            .map { FocusProject(name = it) }
+        return (projects + taskProjects)
+            .distinctBy { it.name.lowercase() }
+            .sortedBy { it.name.lowercase() }
+    }
+
     private fun persistTasks() {
         val tasks = _professionalState.value.tasks
         viewModelScope.launch {
             repository.upsertTasks(tasks)
         }
+    }
+
+    private fun persistProjects() {
+        val projects = _professionalState.value.projects
+        viewModelScope.launch {
+            repository.upsertProjects(projects)
+        }
+    }
+
+    private fun ensureProjectExists(projectName: String) {
+        val trimmed = projectName.trim()
+        if (trimmed.isEmpty()) return
+        if (_professionalState.value.projects.any { it.name.equals(trimmed, ignoreCase = true) }) return
+        val project = FocusProject(name = trimmed, updatedAtEpochMs = System.currentTimeMillis())
+        _professionalState.update { it.copy(projects = (it.projects + project).sortedBy { p -> p.name.lowercase() }) }
+        viewModelScope.launch { repository.upsertProject(project) }
     }
 
     private fun persistSessionRecord(record: SessionRecord) {

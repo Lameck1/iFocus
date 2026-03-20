@@ -89,6 +89,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,17 +190,24 @@ fun FocusScreen(
             TodayPlanCard(
                 state = professionalState,
                 onSelectTask = viewModel::selectTask,
-                onAddTask = { title ->
-                    viewModel.addTask(title = title)
+                onAddTask = { title, projectName ->
+                    viewModel.addTask(title = title, projectName = projectName)
                 },
                 onDeleteTask = viewModel::deleteTask,
                 onArchiveTask = { taskId -> viewModel.setTaskArchived(taskId, true) },
                 onUnarchiveTask = { taskId -> viewModel.setTaskArchived(taskId, false) },
-                onUpdateTask = { taskId, title, estimateMinutes, priority, notes ->
-                    viewModel.updateTask(taskId, title, estimateMinutes, priority, notes)
+                onUpdateTask = { taskId, title, projectName, estimateMinutes, priority, notes, plannedDateEpochDay ->
+                    viewModel.updateTask(taskId, title, projectName, estimateMinutes, priority, notes, plannedDateEpochDay)
                 },
                 onFilterChanged = viewModel::setTaskFilter,
                 onSortChanged = viewModel::setTaskSort
+            )
+
+            ProjectsCard(
+                projects = professionalState.projects,
+                onAddProject = viewModel::addProject,
+                onRenameProject = viewModel::renameProject,
+                onDeleteProject = viewModel::deleteProject
             )
 
             TimerWorkspaceCard(
@@ -354,18 +362,25 @@ private fun FocusOverviewCard(
 private fun TodayPlanCard(
     state: ProfessionalUiState,
     onSelectTask: (String) -> Unit,
-    onAddTask: (String) -> Unit,
+    onAddTask: (String, String) -> Unit,
     onDeleteTask: (String) -> Unit,
     onArchiveTask: (String) -> Unit,
     onUnarchiveTask: (String) -> Unit,
-    onUpdateTask: (String, String, Int, TaskPriority, String) -> Unit,
+    onUpdateTask: (String, String, String, Int, TaskPriority, String, Long?) -> Unit,
     onFilterChanged: (TaskFilter) -> Unit,
     onSortChanged: (TaskSort) -> Unit
 ) {
     var newTaskTitle by rememberSaveable { mutableStateOf("") }
+    var newTaskProject by rememberSaveable { mutableStateOf("") }
     var editingTask by remember { mutableStateOf<FocusTask?>(null) }
     val setEditingTask: (FocusTask?) -> Unit = { task -> editingTask = task }
-    val visibleTasks = state.tasks.visibleTasks(state.taskFilter, state.taskSort)
+    val todayEpochDay = System.currentTimeMillis().toEpochDay()
+    val visibleTasks = state.tasks
+        .visibleTasks(state.taskFilter, state.taskSort)
+        .filter { task ->
+            if (!state.settings.calendarSafePlanningEnabled) true
+            else task.plannedDateEpochDay == null || task.plannedDateEpochDay <= todayEpochDay
+        }
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -433,11 +448,19 @@ private fun TodayPlanCard(
                 singleLine = true,
                 label = { Text(text = stringResource(R.string.new_task_hint)) }
             )
+            OutlinedTextField(
+                value = newTaskProject,
+                onValueChange = { newTaskProject = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(text = stringResource(R.string.project_name)) }
+            )
 
             Button(
                 onClick = {
-                    onAddTask(newTaskTitle)
+                    onAddTask(newTaskTitle, newTaskProject)
                     newTaskTitle = ""
+                    newTaskProject = ""
                 },
                 enabled = newTaskTitle.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
@@ -453,8 +476,8 @@ private fun TodayPlanCard(
         EditTaskDialog(
             task = taskToEdit,
             onDismiss = { setEditingTask(null) },
-            onSave = { title, estimateMinutes, priority, notes ->
-                onUpdateTask(taskToEdit.id, title, estimateMinutes, priority, notes)
+            onSave = { title, projectName, estimateMinutes, priority, notes, plannedDateEpochDay ->
+                onUpdateTask(taskToEdit.id, title, projectName, estimateMinutes, priority, notes, plannedDateEpochDay)
                 setEditingTask(null)
             }
         )
@@ -503,12 +526,14 @@ private fun TaskSortSelector(
 private fun EditTaskDialog(
     task: FocusTask,
     onDismiss: () -> Unit,
-    onSave: (String, Int, TaskPriority, String) -> Unit
+    onSave: (String, String, Int, TaskPriority, String, Long?) -> Unit
 ) {
     var taskTitle by rememberSaveable(task.id) { mutableStateOf(task.title) }
+    var projectName by rememberSaveable(task.id) { mutableStateOf(task.projectName) }
     var estimateText by rememberSaveable(task.id) { mutableStateOf(task.estimateMinutes.toString()) }
     var priority by rememberSaveable(task.id) { mutableStateOf(task.priority) }
     var notes by rememberSaveable(task.id) { mutableStateOf(task.notes) }
+    var plannedDateEpochDay by rememberSaveable(task.id) { mutableStateOf(task.plannedDateEpochDay) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -528,9 +553,19 @@ private fun EditTaskDialog(
                     label = { Text(text = stringResource(R.string.estimate_minutes)) }
                 )
                 OutlinedTextField(
+                    value = projectName,
+                    onValueChange = { projectName = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(R.string.project_name)) }
+                )
+                OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text(text = stringResource(R.string.task_notes)) }
+                )
+                PlanningSelector(
+                    plannedDateEpochDay = plannedDateEpochDay,
+                    onChange = { plannedDateEpochDay = it }
                 )
                 TaskPrioritySelector(
                     selectedPriority = priority,
@@ -545,7 +580,7 @@ private fun EditTaskDialog(
             TextButton(
                 onClick = {
                     val estimate = estimateText.toIntOrNull() ?: task.estimateMinutes
-                    onSave(taskTitle, estimate, priority, notes)
+                    onSave(taskTitle, projectName, estimate, priority, notes, plannedDateEpochDay)
                 }
             ) {
                 Text(text = stringResource(R.string.save))
@@ -553,6 +588,104 @@ private fun EditTaskDialog(
         }
     )
 }
+
+@Composable
+private fun PlanningSelector(plannedDateEpochDay: Long?, onChange: (Long?) -> Unit) {
+    val today = System.currentTimeMillis().toEpochDay()
+    val tomorrow = today + 1
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        val items = listOf<Long?>(null, today, tomorrow)
+        items.forEachIndexed { index, value ->
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = items.size),
+                selected = plannedDateEpochDay == value,
+                onClick = { onChange(value) },
+                label = {
+                    Text(
+                        when (value) {
+                            null -> stringResource(R.string.plan_unscheduled)
+                            today -> stringResource(R.string.plan_today)
+                            else -> stringResource(R.string.plan_tomorrow)
+                        }
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProjectsCard(
+    projects: List<FocusProject>,
+    onAddProject: (String) -> Unit,
+    onRenameProject: (String, String) -> Unit,
+    onDeleteProject: (String) -> Unit
+) {
+    var newProject by rememberSaveable { mutableStateOf("") }
+    var renaming by remember { mutableStateOf<FocusProject?>(null) }
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = stringResource(R.string.projects_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            projects.filterNot { it.isArchived }.take(5).forEach { project ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(project.name, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { renaming = project }) { Text(stringResource(R.string.edit_task)) }
+                    TextButton(onClick = { onDeleteProject(project.name) }) { Text(stringResource(R.string.delete_task)) }
+                }
+            }
+            OutlinedTextField(
+                value = newProject,
+                onValueChange = { newProject = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.project_add_hint)) }
+            )
+            Button(
+                onClick = {
+                    onAddProject(newProject)
+                    newProject = ""
+                },
+                enabled = newProject.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.project_add))
+            }
+        }
+    }
+
+    renaming?.let { project ->
+        RenameProjectDialog(
+            project = project,
+            onDismiss = { renaming = null },
+            onSave = { newName ->
+                onRenameProject(project.name, newName)
+                renaming = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun RenameProjectDialog(project: FocusProject, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by rememberSaveable(project.name) { mutableStateOf(project.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.project_rename)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.project_name)) }
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dismiss)) } },
+        confirmButton = { TextButton(onClick = { onSave(name) }) { Text(stringResource(R.string.save)) } }
+    )
+}
+
+private fun Long.toEpochDay(): Long = TimeUnit.MILLISECONDS.toDays(this)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -611,6 +744,13 @@ private fun TaskListItem(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (task.projectName.isNotBlank()) {
+                    Text(
+                        text = task.projectName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = task.priority.name,
@@ -641,6 +781,13 @@ private fun TaskListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                task.plannedDateEpochDay?.let {
+                    Text(
+                        text = stringResource(R.string.plan_for_day, it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

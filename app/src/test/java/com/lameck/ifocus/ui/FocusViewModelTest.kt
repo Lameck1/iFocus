@@ -446,6 +446,7 @@ class FocusViewModelTest {
         viewModel.updateTask(
             taskId = task.id,
             title = "Updated strategic plan",
+            projectName = "Client Work",
             estimateMinutes = 75,
             priority = TaskPriority.P3,
             notes = "Follow up with client"
@@ -522,6 +523,32 @@ class FocusViewModelTest {
         assertFalse(settings.autoStartFocus)
 
         restored.resetTimer()
+    }
+
+    @Test
+    fun `addProject inserts unique project names`() {
+        viewModel.addProject("Client A")
+        viewModel.addProject("Client A")
+
+        val projects = viewModel.professionalState.value.projects
+        assertEquals(1, projects.count { it.name == "Client A" })
+    }
+
+    @Test
+    fun `deleteProject clears project from tasks`() {
+        val task = viewModel.professionalState.value.tasks.first()
+        viewModel.updateTask(
+            taskId = task.id,
+            title = task.title,
+            projectName = "Ops",
+            estimateMinutes = task.estimateMinutes,
+            priority = task.priority,
+            notes = task.notes
+        )
+        viewModel.deleteProject("Ops")
+
+        val updatedTask = viewModel.professionalState.value.tasks.first { it.id == task.id }
+        assertEquals("", updatedTask.projectName)
     }
 
     private fun advanceBy(milliseconds: Long) {

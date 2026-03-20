@@ -1,5 +1,9 @@
 package com.lameck.ifocus.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +50,10 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 import com.lameck.ifocus.R
 import com.lameck.ifocus.reports.breakdownByTask
+import com.lameck.ifocus.reports.breakdownByProject
+import com.lameck.ifocus.reports.bestStreakDays
 import com.lameck.ifocus.reports.computeSummary
+import com.lameck.ifocus.reports.currentStreakDays
 import com.lameck.ifocus.reports.recordsForCurrentWeek
 import com.lameck.ifocus.reports.recordsForToday
 
@@ -59,7 +67,8 @@ private enum class AppTab {
 private enum class ReportTab {
     TODAY,
     WEEK,
-    BY_TASK
+    BY_TASK,
+    BY_PROJECT
 }
 
 @Composable
@@ -71,6 +80,10 @@ fun AppRootScreen(viewModel: FocusViewModel) {
     val context = LocalContext.current
     val csvExportSuccess = stringResource(R.string.csv_export_success)
     val csvExportFailed = stringResource(R.string.csv_export_failed)
+    var onboardingPage by remember { mutableStateOf(0) }
+    var showOnboarding by remember(professionalState.settings.hasCompletedOnboarding) {
+        mutableStateOf(!professionalState.settings.hasCompletedOnboarding)
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -129,9 +142,46 @@ fun AppRootScreen(viewModel: FocusViewModel) {
                 onThemeChanged = viewModel::setThemePreference,
                 onAutoStartBreakChanged = viewModel::setAutoStartBreak,
                 onAutoStartFocusChanged = viewModel::setAutoStartFocus,
+                onDailyGoalChanged = viewModel::setDailyGoalMinutes,
+                onCalendarSafePlanningChanged = viewModel::setCalendarSafePlanningEnabled,
+                onOpenNotificationHelp = {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
+                },
+                onOpenExactAlarmHelp = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        context.startActivity(intent)
+                    }
+                },
                 modifier = Modifier.padding(innerPadding)
             )
         }
+    }
+
+    LaunchedEffect(professionalState.settings.hasCompletedOnboarding) {
+        if (professionalState.settings.hasCompletedOnboarding) {
+            showOnboarding = false
+        }
+    }
+
+    if (showOnboarding) {
+        OnboardingDialog(
+            page = onboardingPage,
+            onBack = { onboardingPage = (onboardingPage - 1).coerceAtLeast(0) },
+            onNext = {
+                if (onboardingPage >= 2) {
+                    viewModel.completeOnboarding()
+                    showOnboarding = false
+                } else {
+                    onboardingPage += 1
+                }
+            }
+        )
     }
 }
 
@@ -149,8 +199,16 @@ private fun ReportsScreen(
         ReportTab.TODAY -> computeSummary(todayRecords)
         ReportTab.WEEK -> computeSummary(weekRecords)
         ReportTab.BY_TASK -> computeSummary(weekRecords)
+        ReportTab.BY_PROJECT -> computeSummary(weekRecords)
     }
     val byTask = remember(weekRecords) { breakdownByTask(weekRecords).take(5) }
+    val byProject = remember(weekRecords) { breakdownByProject(weekRecords).take(5) }
+    val currentStreak = remember(state.sessionHistory, state.settings.dailyGoalMinutes) {
+        currentStreakDays(state.sessionHistory, state.settings.dailyGoalMinutes)
+    }
+    val bestStreak = remember(state.sessionHistory, state.settings.dailyGoalMinutes) {
+        bestStreakDays(state.sessionHistory, state.settings.dailyGoalMinutes)
+    }
 
     Column(
         modifier = modifier
@@ -170,6 +228,7 @@ private fun ReportsScreen(
                             ReportTab.TODAY -> R.string.report_tab_today
                             ReportTab.WEEK -> R.string.report_tab_week
                             ReportTab.BY_TASK -> R.string.report_tab_by_task
+                            ReportTab.BY_PROJECT -> R.string.report_tab_by_project
                         }
                         Text(stringResource(labelRes))
                     }
@@ -181,12 +240,23 @@ private fun ReportsScreen(
                 Text(stringResource(R.string.reports_total_focus_minutes, summary.totalMinutes))
                 Text(stringResource(R.string.reports_completed_sessions, summary.completedSessions))
                 Text(stringResource(R.string.reports_interrupted_sessions, summary.interruptedSessions))
+                Text(stringResource(R.string.reports_avg_uninterrupted_minutes, summary.averageUninterruptedFocusMinutes))
+                Text(stringResource(R.string.reports_streak_value, currentStreak, bestStreak))
                 if (reportTab == ReportTab.BY_TASK) {
                     if (byTask.isEmpty()) {
                         Text(stringResource(R.string.reports_by_task_empty))
                     } else {
                         byTask.forEach { (taskTitle, minutes) ->
                             Text(stringResource(R.string.reports_by_task_item, taskTitle, minutes))
+                        }
+                    }
+                }
+                if (reportTab == ReportTab.BY_PROJECT) {
+                    if (byProject.isEmpty()) {
+                        Text(stringResource(R.string.reports_by_project_empty))
+                    } else {
+                        byProject.forEach { (projectName, minutes) ->
+                            Text(stringResource(R.string.reports_by_project_item, projectName, minutes))
                         }
                     }
                 }
@@ -233,6 +303,10 @@ private fun SettingsPlaceholder(
     onThemeChanged: (ThemePreference) -> Unit,
     onAutoStartBreakChanged: (Boolean) -> Unit,
     onAutoStartFocusChanged: (Boolean) -> Unit,
+    onDailyGoalChanged: (Int) -> Unit,
+    onCalendarSafePlanningChanged: (Boolean) -> Unit,
+    onOpenNotificationHelp: () -> Unit,
+    onOpenExactAlarmHelp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -262,7 +336,84 @@ private fun SettingsPlaceholder(
                     checked = settings.autoStartFocus,
                     onCheckedChange = onAutoStartFocusChanged
                 )
+                SettingStepRow(
+                    title = stringResource(R.string.settings_daily_goal_minutes),
+                    value = settings.dailyGoalMinutes,
+                    onDecrement = { onDailyGoalChanged(settings.dailyGoalMinutes - 25) },
+                    onIncrement = { onDailyGoalChanged(settings.dailyGoalMinutes + 25) }
+                )
+                SettingSwitchRow(
+                    title = stringResource(R.string.settings_calendar_safe_planning),
+                    checked = settings.calendarSafePlanningEnabled,
+                    onCheckedChange = onCalendarSafePlanningChanged
+                )
             }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.settings_help_title), style = MaterialTheme.typography.titleMedium)
+                Button(onClick = onOpenNotificationHelp, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_help_notifications))
+                }
+                Button(onClick = onOpenExactAlarmHelp, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_help_exact_alarm))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingDialog(
+    page: Int,
+    onBack: () -> Unit,
+    onNext: () -> Unit
+) {
+    val title = when (page) {
+        0 -> stringResource(R.string.onboarding_title_1)
+        1 -> stringResource(R.string.onboarding_title_2)
+        else -> stringResource(R.string.onboarding_title_3)
+    }
+    val body = when (page) {
+        0 -> stringResource(R.string.onboarding_body_1)
+        1 -> stringResource(R.string.onboarding_body_2)
+        else -> stringResource(R.string.onboarding_body_3)
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = {},
+        title = { Text(title) },
+        text = { Text(body) },
+        dismissButton = {
+            if (page > 0) {
+                TextButton(onClick = onBack) { Text(stringResource(R.string.onboarding_back)) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onNext) {
+                Text(if (page >= 2) stringResource(R.string.onboarding_done) else stringResource(R.string.onboarding_next))
+            }
+        }
+    )
+}
+
+@Composable
+private fun SettingStepRow(
+    title: String,
+    value: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit
+) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Text(title)
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onDecrement) { Text("-") }
+            Text("${value}m")
+            TextButton(onClick = onIncrement) { Text("+") }
         }
     }
 }
