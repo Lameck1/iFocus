@@ -45,5 +45,17 @@ interface FocusDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAppSettings(settings: AppSettingsEntity)
+
+    @Query("SELECT * FROM focus_projects")
+    suspend fun getProjects(): List<FocusProjectEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertProject(project: FocusProjectEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertProjects(projects: List<FocusProjectEntity>)
+
+    @Query("DELETE FROM focus_projects WHERE name = :name")
+    suspend fun deleteProject(name: String)
 }
 

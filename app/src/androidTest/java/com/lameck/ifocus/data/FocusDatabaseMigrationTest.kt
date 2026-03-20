@@ -323,6 +323,110 @@ class FocusDatabaseMigrationTest {
         migratedDb.close()
     }
 
+    @Test
+    fun migrate5To6_addsProjectAndGoalColumns() {
+        helper.createDatabase(dbName, 5).apply {
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS focus_tasks (
+                    id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    estimateMinutes INTEGER NOT NULL,
+                    priority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    todayMinutesFocused INTEGER NOT NULL,
+                    notes TEXT NOT NULL,
+                    isArchived INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS session_records (
+                    id TEXT NOT NULL,
+                    taskTitle TEXT NOT NULL,
+                    focusedMinutes INTEGER NOT NULL,
+                    outcome TEXT NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    id TEXT NOT NULL,
+                    themePreference TEXT NOT NULL,
+                    autoStartBreak INTEGER NOT NULL,
+                    autoStartFocus INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            execSQL("INSERT INTO app_settings (id, themePreference, autoStartBreak, autoStartFocus) VALUES ('singleton', 'SYSTEM', 0, 0)")
+            close()
+        }
+
+        val migratedDb = helper.runMigrationsAndValidate(dbName, 6, true, FocusDatabase.MIGRATION_5_6)
+
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('focus_tasks') WHERE name = 'projectName'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('session_records') WHERE name = 'taskId'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('session_records') WHERE name = 'projectName'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('app_settings') WHERE name = 'dailyGoalMinutes'"))
+
+        migratedDb.close()
+    }
+
+    @Test
+    fun migrate6To7_addsProjectsPlanningAndOnboardingColumns() {
+        helper.createDatabase(dbName, 6).apply {
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS focus_tasks (
+                    id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    projectName TEXT NOT NULL,
+                    estimateMinutes INTEGER NOT NULL,
+                    priority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    todayMinutesFocused INTEGER NOT NULL,
+                    notes TEXT NOT NULL,
+                    isArchived INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    id TEXT NOT NULL,
+                    themePreference TEXT NOT NULL,
+                    autoStartBreak INTEGER NOT NULL,
+                    autoStartFocus INTEGER NOT NULL,
+                    dailyGoalMinutes INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            execSQL(
+                "INSERT INTO app_settings (id, themePreference, autoStartBreak, autoStartFocus, dailyGoalMinutes) VALUES ('singleton', 'SYSTEM', 0, 0, 120)"
+            )
+            close()
+        }
+
+        val migratedDb = helper.runMigrationsAndValidate(dbName, 7, true, FocusDatabase.MIGRATION_6_7)
+
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('focus_tasks') WHERE name = 'plannedDateEpochDay'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('app_settings') WHERE name = 'calendarSafePlanningEnabled'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM pragma_table_info('app_settings') WHERE name = 'hasCompletedOnboarding'"))
+        assertEquals(1, count(migratedDb, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'focus_projects'"))
+
+        migratedDb.close()
+    }
+
     private fun count(db: SupportSQLiteDatabase, query: String): Int {
         db.query(query).use { cursor ->
             cursor.moveToFirst()

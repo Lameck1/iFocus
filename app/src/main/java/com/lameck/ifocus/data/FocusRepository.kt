@@ -1,6 +1,7 @@
 package com.lameck.ifocus.data
 
 import com.lameck.ifocus.ui.FocusTask
+import com.lameck.ifocus.ui.FocusProject
 import com.lameck.ifocus.ui.InterruptionReason
 import com.lameck.ifocus.ui.ActiveSession
 import com.lameck.ifocus.ui.AppSettings
@@ -17,6 +18,10 @@ interface FocusRepository {
     suspend fun loadActiveSession(): ActiveSession?
     suspend fun upsertActiveSession(session: ActiveSession)
     suspend fun clearActiveSession()
+    suspend fun loadProjects(): List<FocusProject> = emptyList()
+    suspend fun upsertProject(project: FocusProject) = Unit
+    suspend fun upsertProjects(projects: List<FocusProject>) = Unit
+    suspend fun deleteProject(name: String) = Unit
 
     suspend fun loadAppSettings(): AppSettings = AppSettings()
 

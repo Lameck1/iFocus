@@ -7,11 +7,20 @@ import androidx.room.PrimaryKey
 data class FocusTaskEntity(
     @PrimaryKey val id: String,
     val title: String,
+    val projectName: String,
     val estimateMinutes: Int,
     val priority: String,
     val status: String,
     val todayMinutesFocused: Int,
     val notes: String,
+    val isArchived: Boolean,
+    val plannedDateEpochDay: Long?,
+    val updatedAtEpochMs: Long
+)
+
+@Entity(tableName = "focus_projects")
+data class FocusProjectEntity(
+    @PrimaryKey val name: String,
     val isArchived: Boolean,
     val updatedAtEpochMs: Long
 )
@@ -20,6 +29,8 @@ data class FocusTaskEntity(
 data class SessionRecordEntity(
     @PrimaryKey val id: String,
     val taskTitle: String,
+    val taskId: String?,
+    val projectName: String?,
     val focusedMinutes: Int,
     val outcome: String,
     val createdAtEpochMs: Long
@@ -48,6 +59,9 @@ data class AppSettingsEntity(
     @PrimaryKey val id: String = "singleton",
     val themePreference: String,
     val autoStartBreak: Boolean,
-    val autoStartFocus: Boolean
+    val autoStartFocus: Boolean,
+    val dailyGoalMinutes: Int,
+    val calendarSafePlanningEnabled: Boolean,
+    val hasCompletedOnboarding: Boolean
 )
 

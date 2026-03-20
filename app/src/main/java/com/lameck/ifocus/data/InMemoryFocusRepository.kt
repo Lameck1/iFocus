@@ -1,6 +1,7 @@
 package com.lameck.ifocus.data
 
 import com.lameck.ifocus.ui.FocusTask
+import com.lameck.ifocus.ui.FocusProject
 import com.lameck.ifocus.ui.InterruptionReason
 import com.lameck.ifocus.ui.ActiveSession
 import com.lameck.ifocus.ui.AppSettings
@@ -9,6 +10,7 @@ import com.lameck.ifocus.ui.SessionRecord
 class InMemoryFocusRepository : FocusRepository {
     private val tasks = mutableListOf<FocusTask>()
     private val sessions = mutableListOf<SessionRecord>()
+    private val projects = mutableListOf<FocusProject>()
     private val interruptionCounts = mutableMapOf<InterruptionReason, Int>()
     private var activeSession: ActiveSession? = null
     private var appSettings: AppSettings = AppSettings()
@@ -50,6 +52,26 @@ class InMemoryFocusRepository : FocusRepository {
 
     override suspend fun clearActiveSession() {
         activeSession = null
+    }
+
+    override suspend fun loadProjects(): List<FocusProject> = projects.toList()
+
+    override suspend fun upsertProject(project: FocusProject) {
+        val index = projects.indexOfFirst { it.name == project.name }
+        if (index >= 0) {
+            projects[index] = project
+        } else {
+            projects.add(project)
+        }
+    }
+
+    override suspend fun upsertProjects(projects: List<FocusProject>) {
+        this.projects.clear()
+        this.projects.addAll(projects)
+    }
+
+    override suspend fun deleteProject(name: String) {
+        projects.removeAll { it.name == name }
     }
 
     override suspend fun loadAppSettings(): AppSettings = appSettings
