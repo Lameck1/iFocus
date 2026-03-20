@@ -78,14 +78,14 @@ class FocusSessionForegroundService : Service() {
             0,
             if (paused) getString(R.string.session_action_resume) else getString(R.string.session_action_pause),
             controlPendingIntent(
-                if (paused) ACTION_CONTROL_RESUME else ACTION_CONTROL_PAUSE,
+                if (paused) SessionControlActions.RESUME else SessionControlActions.PAUSE,
                 REQUEST_CODE_CONTROL
             )
         )
         .addAction(
             0,
             getString(R.string.session_action_stop),
-            controlPendingIntent(ACTION_CONTROL_STOP, REQUEST_CODE_STOP)
+            controlPendingIntent(SessionControlActions.STOP, REQUEST_CODE_STOP)
         )
         .setContentIntent(mainActivityPendingIntent())
         .setOngoing(!paused)
@@ -94,7 +94,7 @@ class FocusSessionForegroundService : Service() {
             builder.addAction(
                 0,
                 getString(R.string.session_action_skip_break),
-                controlPendingIntent(ACTION_CONTROL_SKIP_BREAK, REQUEST_CODE_SKIP_BREAK)
+                controlPendingIntent(SessionControlActions.SKIP_BREAK, REQUEST_CODE_SKIP_BREAK)
             )
         }
         return builder.build()
@@ -149,11 +149,6 @@ class FocusSessionForegroundService : Service() {
         const val ACTION_SHOW_RUNNING = "com.lameck.ifocus.action.SERVICE_SHOW_RUNNING"
         const val ACTION_SHOW_PAUSED = "com.lameck.ifocus.action.SERVICE_SHOW_PAUSED"
         const val ACTION_STOP = "com.lameck.ifocus.action.SERVICE_STOP"
-        const val ACTION_CONTROL_PAUSE = "com.lameck.ifocus.action.CONTROL_PAUSE"
-        const val ACTION_CONTROL_RESUME = "com.lameck.ifocus.action.CONTROL_RESUME"
-        const val ACTION_CONTROL_STOP = "com.lameck.ifocus.action.CONTROL_STOP"
-        const val ACTION_CONTROL_SKIP_BREAK = "com.lameck.ifocus.action.CONTROL_SKIP_BREAK"
-        const val ACTION_CONTROL_START_FOCUS = "com.lameck.ifocus.action.CONTROL_START_FOCUS"
         const val EXTRA_TASK_TITLE = "extra_task_title"
         const val EXTRA_MODE_NAME = "extra_mode_name"
         const val EXTRA_REMAINING_SECONDS = "extra_remaining_seconds"

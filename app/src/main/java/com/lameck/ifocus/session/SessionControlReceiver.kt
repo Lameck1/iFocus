@@ -19,11 +19,11 @@ class SessionControlReceiver : BroadcastReceiver() {
             )
 
             when (action) {
-                FocusSessionForegroundService.ACTION_CONTROL_PAUSE -> coordinator.pauseActiveSession()
-                FocusSessionForegroundService.ACTION_CONTROL_RESUME -> coordinator.resumePausedSession()
-                FocusSessionForegroundService.ACTION_CONTROL_STOP -> coordinator.stopSession()
-                FocusSessionForegroundService.ACTION_CONTROL_START_FOCUS -> coordinator.startFocusSession()
-                FocusSessionForegroundService.ACTION_CONTROL_SKIP_BREAK -> coordinator.skipBreak()
+                SessionControlActions.PAUSE -> coordinator.pauseActiveSession()
+                SessionControlActions.RESUME -> coordinator.resumePausedSession()
+                SessionControlActions.STOP -> coordinator.stopSession()
+                SessionControlActions.START_FOCUS -> coordinator.startFocusSession()
+                SessionControlActions.SKIP_BREAK -> coordinator.skipBreak()
             }
         }
     }

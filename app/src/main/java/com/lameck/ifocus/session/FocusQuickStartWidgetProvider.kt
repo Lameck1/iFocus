@@ -39,7 +39,7 @@ class FocusQuickStartWidgetProvider : AppWidgetProvider() {
     private fun buildViews(context: Context): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.focus_quick_start_widget)
         val startIntent = Intent(context, SessionControlReceiver::class.java).apply {
-            action = FocusSessionForegroundService.ACTION_CONTROL_START_FOCUS
+            action = SessionControlActions.START_FOCUS
         }
         val pendingStart = PendingIntent.getBroadcast(
             context,
