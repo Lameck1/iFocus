@@ -17,6 +17,27 @@ $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $logsDir = Join-Path $projectRoot "build-logs"
 New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
 $logFile = Join-Path $logsDir "pre-release-$timestamp.log"
+$gradleArgs = "--console=plain --no-daemon -Dkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false"
+
+function Invoke-ReleaseCleanup {
+    $cleanupTargets = @(
+        ".\app\build\kotlin",
+        ".\app\build\intermediates\built_in_kotlinc",
+        ".\app\build\intermediates\compile_and_runtime_r_class_jar",
+        ".\app\build\intermediates\runtime_app_classes_jar"
+    )
+
+    foreach ($target in $cleanupTargets) {
+        if (Test-Path $target) {
+            try {
+                Remove-Item -Recurse -Force $target -ErrorAction Stop
+            }
+            catch {
+                Write-Warning "Cleanup skipped for locked path: $target"
+            }
+        }
+    }
+}
 
 function Invoke-GradleStep {
     param(
@@ -30,7 +51,7 @@ function Invoke-GradleStep {
         $previousErrorPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         try {
-            cmd /c ".\gradlew.bat $Task --console=plain --no-daemon" 2>&1 | Tee-Object -FilePath $logFile -Append
+            cmd /c ".\gradlew.bat $Task $gradleArgs" 2>&1 | Tee-Object -FilePath $logFile -Append
             $exitCode = $LASTEXITCODE
         }
         finally {
@@ -44,6 +65,7 @@ function Invoke-GradleStep {
         if ($attempt -le $MaxRetries) {
             Write-Warning "Gradle task failed: $Task. Retrying after daemon stop."
             cmd /c ".\gradlew.bat --stop" 2>&1 | Tee-Object -FilePath $logFile -Append | Out-Null
+            Invoke-ReleaseCleanup
             Start-Sleep -Seconds 3
             continue
         }
