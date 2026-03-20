@@ -85,6 +85,28 @@ class SessionControlCoordinator(
     suspend fun startDeepWorkSession() {
         startFocusSession(durationMinutes = 50)
     }
+
+    suspend fun skipBreak() {
+        val current = repository.loadActiveSession() ?: return
+        if (current.mode != TimerMode.SHORT_BREAK && current.mode != TimerMode.LONG_BREAK) return
+
+        val nowMs = elapsedRealtimeProvider()
+        val focusDurationSeconds = TimerMode.FOCUS.durationMinutes * 60
+        val completionMs = nowMs + (focusDurationSeconds * 1_000L)
+        val resumedFocus = current.copy(
+            mode = TimerMode.FOCUS,
+            startedAtMs = nowMs,
+            scheduledCompletionMs = completionMs,
+            isPaused = false,
+            pausedAtMs = null,
+            pausedRemainingSecs = null
+        )
+
+        val taskTitle = repository.loadTasks().firstOrNull { it.id == current.taskId }?.title
+        repository.upsertActiveSession(resumedFocus)
+        alarmScheduler.schedule(completionMs, taskTitle)
+        foregroundController.showRunning(taskTitle, TimerMode.FOCUS.name, focusDurationSeconds)
+    }
 }
 
 

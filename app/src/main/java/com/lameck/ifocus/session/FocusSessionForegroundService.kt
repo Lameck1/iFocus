@@ -45,7 +45,9 @@ class FocusSessionForegroundService : Service() {
         modeName: String,
         remainingSeconds: Int,
         paused: Boolean
-    ) = NotificationCompat.Builder(this, CHANNEL_ID)
+    ): android.app.Notification {
+        val isBreakMode = modeName == "SHORT_BREAK" || modeName == "LONG_BREAK"
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.mipmap.ic_launcher)
         .setContentTitle(getString(R.string.app_name))
         .setContentText(
@@ -88,7 +90,15 @@ class FocusSessionForegroundService : Service() {
         .setContentIntent(mainActivityPendingIntent())
         .setOngoing(!paused)
         .setOnlyAlertOnce(true)
-        .build()
+        if (isBreakMode) {
+            builder.addAction(
+                0,
+                getString(R.string.session_action_skip_break),
+                controlPendingIntent(ACTION_CONTROL_SKIP_BREAK, REQUEST_CODE_SKIP_BREAK)
+            )
+        }
+        return builder.build()
+    }
 
     private fun ensureChannel() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
@@ -142,6 +152,7 @@ class FocusSessionForegroundService : Service() {
         const val ACTION_CONTROL_PAUSE = "com.lameck.ifocus.action.CONTROL_PAUSE"
         const val ACTION_CONTROL_RESUME = "com.lameck.ifocus.action.CONTROL_RESUME"
         const val ACTION_CONTROL_STOP = "com.lameck.ifocus.action.CONTROL_STOP"
+        const val ACTION_CONTROL_SKIP_BREAK = "com.lameck.ifocus.action.CONTROL_SKIP_BREAK"
         const val ACTION_CONTROL_START_FOCUS = "com.lameck.ifocus.action.CONTROL_START_FOCUS"
         const val EXTRA_TASK_TITLE = "extra_task_title"
         const val EXTRA_MODE_NAME = "extra_mode_name"
@@ -152,6 +163,7 @@ class FocusSessionForegroundService : Service() {
         private const val REQUEST_CODE_OPEN_APP = 4202
         private const val REQUEST_CODE_STOP = 4203
         private const val REQUEST_CODE_CONTROL = 4204
+        private const val REQUEST_CODE_SKIP_BREAK = 4205
     }
 }
 

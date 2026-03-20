@@ -112,12 +112,17 @@
     <string name="session_action_pause">Pause</string>
     <string name="session_action_resume">Resume</string>
     <string name="session_action_stop">Stop</string>
+    <string name="session_action_skip_break">Skip break</string>
     <string name="widget_title">Focus Ledger</string>
     <string name="widget_start_focus">Start 25-min focus</string>
     <string name="shortcut_start_focus_short">Start 25</string>
     <string name="shortcut_start_focus_long">Start 25-minute focus session</string>
     <string name="shortcut_start_deep_work_short">Start 50</string>
     <string name="shortcut_start_deep_work_long">Start 50-minute deep work session</string>
+    <string name="shortcut_resume_focus_short">Resume</string>
+    <string name="shortcut_resume_focus_long">Resume active focus session</string>
+    <string name="shortcut_open_reports_short">Reports</string>
+    <string name="shortcut_open_reports_long">Open weekly reports</string>
     <string name="onboarding_title_1">Welcome to Focus Ledger</string>
     <string name="onboarding_body_1">Start a focus session in one tap and keep your workday moving.</string>
     <string name="onboarding_title_2">Why notifications matter</string>

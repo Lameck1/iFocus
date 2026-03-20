@@ -206,6 +206,35 @@ class SessionControlCoordinatorTest {
         assertEquals(3_100_000L, scheduler.lastScheduledAtMs)
     }
 
+    @Test
+    fun `skip break switches session back to focus`() = runTest {
+        val repository = FakeRepository(
+            tasks = mutableListOf(sampleTask()),
+            activeSession = ActiveSession(
+                taskId = TASK_ID,
+                mode = TimerMode.SHORT_BREAK,
+                startedAtMs = 1_000L,
+                scheduledCompletionMs = 20_000L,
+                isPaused = false
+            )
+        )
+        val scheduler = FakeAlarmScheduler()
+        val foreground = FakeForegroundController()
+        val coordinator = SessionControlCoordinator(
+            repository,
+            scheduler,
+            foreground,
+            elapsedRealtimeProvider = { 10_000L }
+        )
+
+        coordinator.skipBreak()
+
+        assertEquals(TimerMode.FOCUS, repository.activeSession?.mode)
+        assertEquals(1_510_000L, repository.activeSession?.scheduledCompletionMs)
+        assertEquals(1, scheduler.scheduleCount)
+        assertEquals(1, foreground.runningCount)
+    }
+
     private fun sampleTask() = FocusTask(
         id = TASK_ID,
         title = "Draft proposal",

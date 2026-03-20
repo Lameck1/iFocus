@@ -23,6 +23,30 @@
             android:targetClass="com.lameck.ifocus.MainActivity"
             android:targetPackage="com.lameck.ifocus" />
     </shortcut>
+
+    <shortcut
+        android:shortcutId="resume_focus"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_resume_focus_short"
+        android:shortcutLongLabel="@string/shortcut_resume_focus_long">
+        <intent
+            android:action="com.lameck.ifocus.action.SHORTCUT_RESUME_FOCUS"
+            android:targetClass="com.lameck.ifocus.MainActivity"
+            android:targetPackage="com.lameck.ifocus" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="open_reports"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_open_reports_short"
+        android:shortcutLongLabel="@string/shortcut_open_reports_long">
+        <intent
+            android:action="com.lameck.ifocus.action.SHORTCUT_OPEN_REPORTS"
+            android:targetClass="com.lameck.ifocus.MainActivity"
+            android:targetPackage="com.lameck.ifocus" />
+    </shortcut>
 </shortcuts>
 
 

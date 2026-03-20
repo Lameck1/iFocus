@@ -72,7 +72,7 @@ private enum class ReportTab {
 }
 
 @Composable
-fun AppRootScreen(viewModel: FocusViewModel) {
+fun AppRootScreen(viewModel: FocusViewModel, launchDestination: String? = null) {
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
     val professionalState by viewModel.professionalState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -83,6 +83,15 @@ fun AppRootScreen(viewModel: FocusViewModel) {
     var onboardingPage by remember { mutableStateOf(0) }
     var showOnboarding by remember(professionalState.settings.hasCompletedOnboarding) {
         mutableStateOf(!professionalState.settings.hasCompletedOnboarding)
+    }
+
+    LaunchedEffect(launchDestination) {
+        selectedTab = when (launchDestination) {
+            "REPORTS" -> AppTab.REPORTS
+            "SETTINGS" -> AppTab.SETTINGS
+            "HISTORY" -> AppTab.HISTORY
+            else -> selectedTab
+        }
     }
 
     Scaffold(
