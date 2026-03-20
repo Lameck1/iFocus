@@ -3,6 +3,8 @@ package com.lameck.ifocus.session
 import com.lameck.ifocus.ui.ActiveSession
 import com.lameck.ifocus.ui.TimerMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionDomainTest {
@@ -37,6 +39,22 @@ class SessionDomainTest {
         ).toSessionStatus()
 
         assertEquals(SessionStatus.PAUSED_FOCUS, status)
+    }
+
+    @Test
+    fun `session status helper predicates classify status correctly`() {
+        assertTrue(SessionStatus.RUNNING_FOCUS.isRunning())
+        assertFalse(SessionStatus.RUNNING_FOCUS.isPaused())
+        assertFalse(SessionStatus.RUNNING_FOCUS.isTerminal())
+
+        assertTrue(SessionStatus.PAUSED_BREAK.isPaused())
+        assertFalse(SessionStatus.PAUSED_BREAK.isRunning())
+        assertFalse(SessionStatus.PAUSED_BREAK.isTerminal())
+
+        assertTrue(SessionStatus.COMPLETED.isTerminal())
+        assertTrue(SessionStatus.CANCELLED.isTerminal())
+        assertFalse(SessionStatus.IDLE.isRunning())
+        assertFalse(SessionStatus.IDLE.isPaused())
     }
 }
 

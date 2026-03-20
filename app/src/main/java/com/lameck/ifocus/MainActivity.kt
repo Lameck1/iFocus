@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lameck.ifocus.data.FocusRepositoryProvider
 import com.lameck.ifocus.session.AndroidSessionAlarmScheduler
 import com.lameck.ifocus.session.AndroidSessionForegroundController
+import com.lameck.ifocus.session.SessionControlCoordinator
 import com.lameck.ifocus.session.SessionStartupReconciler
 import com.lameck.ifocus.ui.AppRootScreen
 import com.lameck.ifocus.ui.FocusViewModel
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
             val repository = FocusRepositoryProvider.get(applicationContext)
             val alarmScheduler = AndroidSessionAlarmScheduler(applicationContext)
             SessionStartupReconciler(repository, alarmScheduler).reconcileAndReschedule()
+            handleShortcutActionIfNeeded()
         }
 
         setContent {
@@ -59,5 +61,29 @@ class MainActivity : ComponentActivity() {
                 AppRootScreen(viewModel = focusViewModel)
             }
         }
+    }
+
+    private suspend fun handleShortcutActionIfNeeded() {
+        val action = intent?.action ?: return
+        if (action != ACTION_SHORTCUT_START_FOCUS && action != ACTION_SHORTCUT_START_DEEP_WORK) return
+
+        val repository = FocusRepositoryProvider.get(applicationContext)
+        val alarmScheduler = AndroidSessionAlarmScheduler(applicationContext)
+        val foregroundController = AndroidSessionForegroundController(applicationContext)
+        val coordinator = SessionControlCoordinator(
+            repository = repository,
+            alarmScheduler = alarmScheduler,
+            foregroundController = foregroundController
+        )
+        if (action == ACTION_SHORTCUT_START_DEEP_WORK) {
+            coordinator.startDeepWorkSession()
+        } else {
+            coordinator.startFocusSession()
+        }
+    }
+
+    companion object {
+        private const val ACTION_SHORTCUT_START_FOCUS = "com.lameck.ifocus.action.SHORTCUT_START_FOCUS"
+        private const val ACTION_SHORTCUT_START_DEEP_WORK = "com.lameck.ifocus.action.SHORTCUT_START_DEEP_WORK"
     }
 }

@@ -2,6 +2,8 @@ package com.lameck.ifocus.session
 
 import android.os.SystemClock
 import com.lameck.ifocus.data.FocusRepository
+import com.lameck.ifocus.ui.ActiveSession
+import com.lameck.ifocus.ui.TimerMode
 import com.lameck.ifocus.session.usecase.PauseSessionUseCase
 import com.lameck.ifocus.session.usecase.ResumeSessionUseCase
 import com.lameck.ifocus.session.usecase.StopSessionUseCase
@@ -52,6 +54,36 @@ class SessionControlCoordinator(
 
     suspend fun stopSession() {
         stopSessionUseCase()
+    }
+
+    suspend fun startFocusSession(durationMinutes: Int = TimerMode.FOCUS.durationMinutes) {
+        val existing = repository.loadActiveSession()
+        if (existing != null) {
+            if (existing.isPaused) {
+                resumeSessionUseCase()
+            }
+            return
+        }
+
+        val task = repository.loadTasks().firstOrNull { !it.isArchived } ?: return
+        val nowMs = elapsedRealtimeProvider()
+        val focusDurationSeconds = durationMinutes.coerceIn(1, 180) * 60
+        val completionMs = nowMs + (focusDurationSeconds * 1_000L)
+        val session = ActiveSession(
+            taskId = task.id,
+            mode = TimerMode.FOCUS,
+            startedAtMs = nowMs,
+            scheduledCompletionMs = completionMs,
+            isPaused = false
+        )
+
+        repository.upsertActiveSession(session)
+        alarmScheduler.schedule(completionMs, task.title)
+        foregroundController.showRunning(task.title, TimerMode.FOCUS.name, focusDurationSeconds)
+    }
+
+    suspend fun startDeepWorkSession() {
+        startFocusSession(durationMinutes = 50)
     }
 }
 

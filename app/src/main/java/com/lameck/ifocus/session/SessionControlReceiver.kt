@@ -22,6 +22,7 @@ class SessionControlReceiver : BroadcastReceiver() {
                 FocusSessionForegroundService.ACTION_CONTROL_PAUSE -> coordinator.pauseActiveSession()
                 FocusSessionForegroundService.ACTION_CONTROL_RESUME -> coordinator.resumePausedSession()
                 FocusSessionForegroundService.ACTION_CONTROL_STOP -> coordinator.stopSession()
+                FocusSessionForegroundService.ACTION_CONTROL_START_FOCUS -> coordinator.startFocusSession()
             }
         }
     }

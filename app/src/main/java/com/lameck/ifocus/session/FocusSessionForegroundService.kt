@@ -142,6 +142,7 @@ class FocusSessionForegroundService : Service() {
         const val ACTION_CONTROL_PAUSE = "com.lameck.ifocus.action.CONTROL_PAUSE"
         const val ACTION_CONTROL_RESUME = "com.lameck.ifocus.action.CONTROL_RESUME"
         const val ACTION_CONTROL_STOP = "com.lameck.ifocus.action.CONTROL_STOP"
+        const val ACTION_CONTROL_START_FOCUS = "com.lameck.ifocus.action.CONTROL_START_FOCUS"
         const val EXTRA_TASK_TITLE = "extra_task_title"
         const val EXTRA_MODE_NAME = "extra_mode_name"
         const val EXTRA_REMAINING_SECONDS = "extra_remaining_seconds"

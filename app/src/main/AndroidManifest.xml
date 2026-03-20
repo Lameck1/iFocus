@@ -21,6 +21,9 @@
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.IFocus">
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -35,6 +38,18 @@
         <receiver
             android:name=".session.SessionControlReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".session.FocusQuickStartWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/focus_quick_start_widget_info" />
+        </receiver>
 
         <receiver
             android:name=".session.SessionBootReceiver"

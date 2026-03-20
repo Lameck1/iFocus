@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="start_focus"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_start_focus_short"
+        android:shortcutLongLabel="@string/shortcut_start_focus_long">
+        <intent
+            android:action="com.lameck.ifocus.action.SHORTCUT_START_FOCUS"
+            android:targetClass="com.lameck.ifocus.MainActivity"
+            android:targetPackage="com.lameck.ifocus" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="start_deep_work"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_start_deep_work_short"
+        android:shortcutLongLabel="@string/shortcut_start_deep_work_long">
+        <intent
+            android:action="com.lameck.ifocus.action.SHORTCUT_START_DEEP_WORK"
+            android:targetClass="com.lameck.ifocus.MainActivity"
+            android:targetPackage="com.lameck.ifocus" />
+    </shortcut>
+</shortcuts>
+
+
+

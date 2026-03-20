@@ -131,6 +131,81 @@ class SessionControlCoordinatorTest {
         assertEquals(0, foreground.pausedCount)
     }
 
+    @Test
+    fun `start focus creates session and schedules alarm when idle`() = runTest {
+        val repository = FakeRepository(tasks = mutableListOf(sampleTask()))
+        val scheduler = FakeAlarmScheduler()
+        val foreground = FakeForegroundController()
+        val coordinator = SessionControlCoordinator(
+            repository,
+            scheduler,
+            foreground,
+            elapsedRealtimeProvider = { 10_000L }
+        )
+
+        coordinator.startFocusSession()
+
+        val started = repository.activeSession
+        assertEquals(TASK_ID, started?.taskId)
+        assertEquals(TimerMode.FOCUS, started?.mode)
+        assertTrue(started?.isPaused == false)
+        assertEquals(1_510_000L, started?.scheduledCompletionMs)
+        assertEquals(1, scheduler.scheduleCount)
+        assertEquals(1_510_000L, scheduler.lastScheduledAtMs)
+        assertEquals(1, foreground.runningCount)
+        assertEquals("Draft proposal", foreground.lastTaskTitle)
+    }
+
+    @Test
+    fun `start focus resumes existing paused session`() = runTest {
+        val repository = FakeRepository(
+            tasks = mutableListOf(sampleTask()),
+            activeSession = ActiveSession(
+                taskId = TASK_ID,
+                mode = TimerMode.FOCUS,
+                startedAtMs = 1_000L,
+                scheduledCompletionMs = 30_000L,
+                isPaused = true,
+                pausedAtMs = 5_000L,
+                pausedRemainingSecs = 20
+            )
+        )
+        val scheduler = FakeAlarmScheduler()
+        val foreground = FakeForegroundController()
+        val coordinator = SessionControlCoordinator(
+            repository,
+            scheduler,
+            foreground,
+            elapsedRealtimeProvider = { 40_000L }
+        )
+
+        coordinator.startFocusSession()
+
+        val resumed = repository.activeSession
+        assertTrue(resumed?.isPaused == false)
+        assertEquals(60_000L, resumed?.scheduledCompletionMs)
+        assertEquals(1, scheduler.scheduleCount)
+        assertEquals(1, foreground.runningCount)
+    }
+
+    @Test
+    fun `start deep work creates 50 minute session`() = runTest {
+        val repository = FakeRepository(tasks = mutableListOf(sampleTask()))
+        val scheduler = FakeAlarmScheduler()
+        val foreground = FakeForegroundController()
+        val coordinator = SessionControlCoordinator(
+            repository,
+            scheduler,
+            foreground,
+            elapsedRealtimeProvider = { 100_000L }
+        )
+
+        coordinator.startDeepWorkSession()
+
+        assertEquals(3_100_000L, repository.activeSession?.scheduledCompletionMs)
+        assertEquals(3_100_000L, scheduler.lastScheduledAtMs)
+    }
+
     private fun sampleTask() = FocusTask(
         id = TASK_ID,
         title = "Draft proposal",
